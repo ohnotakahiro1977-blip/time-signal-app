@@ -1,401 +1,370 @@
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>時報音シミュレーション (連続再生・音色選択)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* フォント設定 */
-        :root {
-            font-family: 'Inter', sans-serif;
-        }
-        /* カスタムスタイリング */
-        .signal-display {
-            font-size: 6rem;
-            font-weight: 700;
-            transition: color 0.1s;
-            margin-bottom: 0.5rem;
-        }
-        .container-box {
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        }
-        /* LINEボタンのカスタムスタイル */
-        .line-share-button {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            background-color: #00C300; /* LINEのブランドカラー */
-            color: white;
-            font-weight: bold;
-            text-decoration: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            transition: background-color 0.3s;
-        }
-        .line-share-button:hover {
-            background-color: #00A800;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>練習用スタート信号＆ストップウォッチ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root { font-family: 'Inter', sans-serif; }
+  .big-display { font-size: 4.2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .sw-display { font-size: 4.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .flash { animation: flashBg 0.5s ease-out; }
+  @keyframes flashBg { 0% { background-color: #fca5a5; } 100% { background-color: transparent; } }
+  input[type=number] { -moz-appearance: textfield; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+</style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-100 min-h-screen p-3">
 
-    <div class="w-full max-w-lg bg-white p-6 md:p-10 rounded-xl container-box text-center">
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">連続時報音シミュレーション</h1>
-        <p class="text-gray-600 mb-6">音色を選択し、5秒毎の「ピッ・ピッ・ポーン」パターンを連続再生します。</p>
+<div class="w-full max-w-xl mx-auto flex flex-col gap-4">
 
-        <!-- 設定パネル -->
-        <div class="mb-6 p-4 bg-gray-100 rounded-lg shadow-inner">
-            <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b pb-2">時報音 周波数設定 (Hz)</h2>
-            
-            <!-- プリセット選択ドロップダウン -->
-            <div class="mb-4">
-                <label for="presetSelector" class="block text-sm font-medium text-gray-700 text-left mb-1">音色プリセットを選ぶ</label>
-                <select id="presetSelector" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                    <!-- オプションはJavaScriptで動的に追加されます -->
-                </select>
-            </div>
+  <h1 class="text-2xl font-bold text-gray-800 text-center mt-2">🏊 練習用スタート信号＆ストップウォッチ</h1>
 
-            <div class="flex flex-col sm:flex-row gap-4 justify-between">
-                <!-- 低音設定 -->
-                <div class="w-full sm:w-1/2">
-                    <label for="lowFreqInput" class="block text-sm font-medium text-gray-600 text-left mb-1">低音（ピッ）</label>
-                    <input type="number" id="lowFreqInput" value="600" min="20" max="20000" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-center" />
-                </div>
-                <!-- 高音設定 -->
-                <div class="w-full sm:w-1/2">
-                    <label for="highFreqInput" class="block text-sm font-medium text-gray-600 text-left mb-1">高音（ポーン）</label>
-                    <input type="number" id="highFreqInput" value="1800" min="20" max="20000" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-center" />
-                </div>
-            </div>
-            <p class="text-xs text-gray-500 mt-2">※ 周波数を手動で変更すると、プリセットは「カスタマイズ」になります。</p>
-        </div>
+  <!-- ===== スタート信号（練習メニュー連動） ===== -->
+  <section class="bg-white rounded-xl shadow p-4">
+    <h2 class="text-xl font-bold text-gray-700 border-b pb-2 mb-3">📋 練習メニュー → スタート音</h2>
 
-        <!-- タイマー表示エリア -->
-        <div id="timerDisplay" class="signal-display text-gray-300">
-            00.00
-        </div>
-
-        <!-- メッセージエリア -->
-        <div id="message" class="h-8 text-lg font-medium text-blue-600 mb-8">
-            準備完了
-        </div>
-
-        <!-- コントロールボタン -->
-        <button id="startButton" class="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-300">
-            再生開始
-        </button>
-
-        <p class="text-sm text-gray-500 mt-4">
-            ※ 連続再生されます。「停止」ボタンを押すか、画面を閉じるまで停止しません。
-        </p>
-        
-        <!-- LINE 共有ボタン -->
-        <a id="lineShareButton" href="#" target="_blank" class="line-share-button mt-6">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0c6.627 0 12 5.373 12 12s-5.373 12-12 12S0 18.627 0 12 5.373 0 12 0zM7.5 7.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm9 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM12 11.25c-1.657 0-3 1.343-3 3v1.5h6v-1.5c0-1.657-1.343-3-3-3z"/>
-            </svg>
-            <span>LINEで友だちに共有</span>
-        </a>
+    <div class="grid grid-cols-2 gap-3 text-left">
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">距離 (m)</label>
+        <input id="distInput" type="number" value="50" min="1" class="w-full p-2 border rounded-md text-center text-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">本数</label>
+        <input id="repsInput" type="number" value="8" min="1" class="w-full p-2 border rounded-md text-center text-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">サイクル（分）</label>
+        <input id="cycleMinInput" type="number" value="1" min="0" class="w-full p-2 border rounded-md text-center text-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">サイクル（秒）</label>
+        <input id="cycleSecInput" type="number" value="10" min="0" max="59" class="w-full p-2 border rounded-md text-center text-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">スタート人数（ずらす人数）</label>
+        <input id="swimmersInput" type="number" value="4" min="1" class="w-full p-2 border rounded-md text-center text-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">ずらし間隔（秒）</label>
+        <input id="staggerInput" type="number" value="10" min="1" class="w-full p-2 border rounded-md text-center text-lg">
+      </div>
     </div>
 
-    <script>
-        // グローバル変数
-        let audioContext;
-        let startTime;
-        let timerInterval = null; // nullで停止状態を示す
-        const cycleDuration = 5;  // 5秒サイクル
-        
-        // =========================================================
-        // 【重要】共有URLの設定 - ここに取得したURLを貼り付けてください
-        // =========================================================
-        // 例: const LINE_SHARE_URL = encodeURIComponent("https://.github.io/time-signal-app/");
-        const LINE_SHARE_URL = encodeURIComponent("https://ohnotakahiro1977-blip.github.io/time-signal-app/"); 
-        
-        const LINE_SHARE_TEXT = encodeURIComponent("🚨 楽しい時報シミュレーターを見つけたよ！22種類以上の音源（木魚、呼び鈴など）を選べるよ。試してみて！");
+    <label class="flex items-center gap-2 mt-3 text-sm text-gray-700">
+      <input id="preBeepToggle" type="checkbox" checked class="w-5 h-5">
+      各スタートの3・2・1秒前に予告音（ピッ）を鳴らす
+    </label>
+    <label class="flex items-center gap-2 mt-2 text-sm text-gray-700">
+      <input id="swSyncToggle" type="checkbox" checked class="w-5 h-5">
+      ストップウォッチを最初のスタート音に連動して開始する（リセットしてスタート）
+    </label>
 
-        // 22種類の音色プリセット
-        const presets = [
-            { name: '標準電話時報 (オリジナル)', low: 600, high: 1800 }, // 初期値
-            { name: '古い電話時報 (レトロ)', low: 440, high: 880 },
-            { name: '現代デジタル (クリア)', low: 1500, high: 2500 },
-            { name: '深い低音 (ドローン)', low: 200, high: 500 },
-            { name: '高い高音 (キンキン)', low: 3000, high: 5000 },
-            { name: 'ピアノ和音 (C4-G4)', low: 261, high: 392 },
-            { name: '警告音A (高め)', low: 880, high: 1320 },
-            { name: '警告音B (低め)', low: 400, high: 1000 },
-            { name: 'ノスタルジー', low: 500, high: 1000 },
-            { name: 'ゲームボーイ風', low: 800, high: 1600 },
-            { name: 'スクエア波風', low: 700, high: 1400 },
-            { name: 'サイレン風', low: 900, high: 1100 },
-            { name: 'ホラー風', low: 100, high: 200 },
-            { name: '短三度 (悲しい音)', low: 440, high: 523 },
-            { name: '完全五度 (安定音)', low: 440, high: 660 },
-            { name: '電子音A', low: 1200, high: 2000 },
-            { name: '電子音B', low: 1800, high: 3600 },
-            { name: '宇宙船', low: 400, high: 700 },
-            { name: 'カチカチ音', low: 2000, high: 2000 }, // 同じ周波数で単調な音
-            { name: '呼び鈴 (チャイム風)', low: 784, high: 988 }, // G5とB5で明るい音をシミュレート
-            { name: '木魚 (低音パーカッション)', low: 150, high: 250 }, // 深く響く音をシミュレート
-            { name: 'カスタマイズ', low: 600, high: 1800 } // ユーザー手動入力用 (初期値)
-        ];
+    <details class="mt-3">
+      <summary class="text-sm text-gray-500 cursor-pointer">音色設定（周波数）</summary>
+      <div class="grid grid-cols-2 gap-3 mt-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">予告音（低音 Hz）</label>
+          <input id="lowFreqInput" type="number" value="600" min="20" max="20000" class="w-full p-2 border rounded-md text-center">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">スタート音（高音 Hz）</label>
+          <input id="highFreqInput" type="number" value="1800" min="20" max="20000" class="w-full p-2 border rounded-md text-center">
+        </div>
+      </div>
+      <button id="testSoundButton" class="mt-2 px-3 py-2 bg-gray-200 rounded-md text-sm">🔊 スタート音を試し鳴らし</button>
+    </details>
 
-        // DOM要素
-        const startButton = document.getElementById('startButton');
-        const timerDisplay = document.getElementById('timerDisplay');
-        const messageDisplay = document.getElementById('message');
-        const lowFreqInput = document.getElementById('lowFreqInput');
-        const highFreqInput = document.getElementById('highFreqInput');
-        const presetSelector = document.getElementById('presetSelector');
-        const lineShareButton = document.getElementById('lineShareButton');
+    <!-- 状態表示 -->
+    <div id="menuStatusBox" class="mt-4 text-center rounded-lg py-3">
+      <div id="menuNext" class="text-lg font-semibold text-gray-700">メニューを設定して「スタート」を押してください</div>
+      <div id="menuCount" class="big-display text-gray-800">--.-</div>
+      <div id="menuProgress" class="text-base text-gray-500">待機中</div>
+    </div>
 
-        /**
-         * プリセット選択肢をドロップダウンに追加する
-         */
-        function populatePresets() {
-            presets.forEach((preset, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = preset.name + ` (${preset.low}Hz / ${preset.high}Hz)`;
-                if (index === 0) {
-                    option.selected = true;
-                }
-                presetSelector.appendChild(option);
-            });
+    <button id="menuStartButton" class="w-full py-4 bg-green-600 text-white text-xl font-bold rounded-lg shadow">▶ メニュー開始</button>
+  </section>
+
+  <!-- ===== ストップウォッチ ===== -->
+  <section class="bg-white rounded-xl shadow p-4">
+    <h2 class="text-xl font-bold text-gray-700 border-b pb-2 mb-3">⏱ ストップウォッチ</h2>
+
+    <div id="swDisplay" class="sw-display text-center text-gray-800">00:00.00</div>
+
+    <div class="grid grid-cols-2 gap-3 mt-3">
+      <button id="swToggleButton" class="py-5 bg-blue-600 text-white text-2xl font-bold rounded-lg shadow">スタート</button>
+      <button id="swLapButton" class="py-5 bg-amber-500 text-white text-2xl font-bold rounded-lg shadow opacity-40" disabled>ラップ</button>
+    </div>
+    <button id="swResetButton" class="w-full mt-3 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg">リセット</button>
+
+    <label class="flex items-center gap-2 mt-3 text-sm text-gray-700">
+      <input id="voiceToggle" type="checkbox" checked class="w-5 h-5">
+      記録を読み上げる（ラップはそのままの記録を「5秒4」の形＝秒の1の位＋小数1桁で読み上げ）
+    </label>
+
+    <ul id="lapList" class="mt-3 divide-y text-left"></ul>
+
+    <button id="exportButton" class="w-full mt-3 py-3 bg-emerald-600 text-white font-bold rounded-lg shadow opacity-40" disabled>📊 記録をExcelで保存（0件）</button>
+
+    <p class="text-xs text-gray-400 mt-3">
+      キーボード対応：スペース＝スタート/ストップ、L / Enter＝ラップ（Bluetoothキーボード・リモコンでも可）<br>
+      ※ スマホの音量ボタンはブラウザでは取得できないため、割り当てはこの大ボタンとキーボードで代用しています。音量ボタン自体を使いたい場合はネイティブアプリ化が必要です。
+    </p>
+  </section>
+
+  <p class="text-center text-xs text-gray-400 pb-4">time-signal-app 改良版（練習用）／元の時報モードは別途残せます</p>
+</div>
+
+<script>
+  // ================= 音声エンジン（元のアプリから継承） =================
+  let audioContext = null;
+  async function ensureAudio() {
+    if (!audioContext || audioContext.state === 'closed') {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') { await audioContext.resume(); }
+  }
+  function playSignal(frequency, duration, type) {
+    if (!audioContext || audioContext.state !== 'running') return;
+    const osc = audioContext.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    const gain = audioContext.createGain();
+    const now = audioContext.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.6, now + 0.01);
+    if (type === 'long') { gain.gain.setValueAtTime(0.6, now + duration - 0.1); }
+    gain.gain.linearRampToValueAtTime(0, now + duration);
+    osc.connect(gain); gain.connect(audioContext.destination);
+    osc.start(); osc.stop(now + duration);
+  }
+  const lowFreq = () => parseInt(document.getElementById('lowFreqInput').value, 10) || 600;
+  const highFreq = () => parseInt(document.getElementById('highFreqInput').value, 10) || 1800;
+
+  // ================= 画面スリープ防止 =================
+  let wakeLock = null;
+  async function keepAwake(on) {
+    try {
+      if (on && 'wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); }
+      else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) { /* 対応端末のみ */ }
+  }
+
+  // ================= 練習メニュー → スタート音スケジューラ =================
+  const menuStartButton = document.getElementById('menuStartButton');
+  const menuNext = document.getElementById('menuNext');
+  const menuCount = document.getElementById('menuCount');
+  const menuProgress = document.getElementById('menuProgress');
+  const menuStatusBox = document.getElementById('menuStatusBox');
+
+  let menuTimer = null;
+  let menuEvents = [];   // {time(ms, performance基準), kind:'pre'|'start', rep, swimmer}
+  let menuFired = 0;
+  let menuTotalStarts = 0;
+
+  function buildMenuEvents(t0) {
+    const reps = Math.max(1, parseInt(document.getElementById('repsInput').value, 10) || 1);
+    const cycle = (parseInt(document.getElementById('cycleMinInput').value, 10) || 0) * 60
+                + (parseInt(document.getElementById('cycleSecInput').value, 10) || 0);
+    const swimmers = Math.max(1, parseInt(document.getElementById('swimmersInput').value, 10) || 1);
+    const stagger = Math.max(1, parseInt(document.getElementById('staggerInput').value, 10) || 10);
+    const pre = document.getElementById('preBeepToggle').checked;
+    const evs = [];
+    for (let r = 0; r < reps; r++) {
+      for (let k = 0; k < swimmers; k++) {
+        const t = t0 + (r * cycle + k * stagger) * 1000;
+        if (pre) { for (const off of [3000, 2000, 1000]) { evs.push({ time: t - off, kind: 'pre', rep: r + 1, swimmer: k + 1 }); } }
+        evs.push({ time: t, kind: 'start', rep: r + 1, swimmer: k + 1 });
+      }
+    }
+    evs.sort((a, b) => a.time - b.time);
+    menuTotalStarts = reps * swimmers;
+    return evs;
+  }
+
+  function stopMenu(finished) {
+    if (menuTimer) { clearInterval(menuTimer); menuTimer = null; }
+    menuStartButton.textContent = '▶ メニュー開始';
+    menuStartButton.classList.replace('bg-red-600', 'bg-green-600');
+    if (finished) {
+      menuNext.textContent = '✅ メニュー完了！';
+      menuCount.textContent = '--.-';
+      menuProgress.textContent = `全 ${menuTotalStarts} 回のスタート信号を鳴らしました`;
+    } else {
+      menuNext.textContent = '中断しました';
+      menuProgress.textContent = '待機中';
+    }
+    keepAwake(false);
+  }
+
+  menuStartButton.addEventListener('click', async () => {
+    if (menuTimer) { stopMenu(false); return; }
+    await ensureAudio();
+    const dist = parseInt(document.getElementById('distInput').value, 10) || 0;
+    const reps = parseInt(document.getElementById('repsInput').value, 10) || 0;
+    const t0 = performance.now() + 3000; // 3秒後に1回目の予告音〜スタート
+    menuEvents = buildMenuEvents(t0);
+    menuFired = 0;
+    menuStartButton.textContent = '■ 中止';
+    menuStartButton.classList.replace('bg-green-600', 'bg-red-600');
+    menuProgress.textContent = `${dist}m × ${reps}本 スタート待機中…`;
+    keepAwake(true);
+
+    menuTimer = setInterval(() => {
+      const now = performance.now();
+      while (menuFired < menuEvents.length && menuEvents[menuFired].time <= now) {
+        const ev = menuEvents[menuFired++];
+        if (ev.kind === 'pre') {
+          playSignal(lowFreq(), 0.09, 'short');
+        } else {
+          playSignal(highFreq(), 0.6, 'long');
+          menuStatusBox.classList.remove('flash'); void menuStatusBox.offsetWidth; menuStatusBox.classList.add('flash');
+          menuProgress.textContent = `${ev.rep}本目・${ev.swimmer}人目 スタート！`;
+          if (ev.rep === 1 && ev.swimmer === 1 && document.getElementById('swSyncToggle').checked) {
+            swSyncStart();
+          }
         }
+      }
+      const next = menuEvents.slice(menuFired).find(e => e.kind === 'start');
+      if (!next) { stopMenu(true); return; }
+      const remain = Math.max(0, (next.time - now) / 1000);
+      menuNext.textContent = `次のスタート：${next.rep}本目・${next.swimmer}人目`;
+      menuCount.textContent = remain.toFixed(1);
+    }, 30);
+  });
 
-        /**
-         * プリセット選択時に周波数入力欄を更新する
-         */
-        presetSelector.addEventListener('change', (event) => {
-            const selectedIndex = parseInt(event.target.value, 10);
-            const preset = presets[selectedIndex];
-            if (preset) {
-                lowFreqInput.value = preset.low;
-                highFreqInput.value = preset.high;
-            }
-        });
+  document.getElementById('testSoundButton').addEventListener('click', async () => {
+    await ensureAudio();
+    playSignal(lowFreq(), 0.09, 'short');
+    setTimeout(() => playSignal(highFreq(), 0.6, 'long'), 350);
+  });
 
-        /**
-         * 手動で周波数を変更した際、「カスタマイズ」に変更する
-         */
-        function setCustomPreset() {
-            const customIndex = presets.findIndex(p => p.name === 'カスタマイズ');
-            if (presetSelector.value !== customIndex.toString()) {
-                 presetSelector.value = customIndex;
-                 // カスタマイズのテキストも現在の値に更新する
-                 const customOption = presetSelector.options[customIndex];
-                 if (customOption) {
-                    customOption.textContent = `カスタマイズ (${lowFreqInput.value}Hz / ${highFreqInput.value}Hz)`;
-                 }
-            }
-        }
+  // ================= ストップウォッチ =================
+  const swDisplay = document.getElementById('swDisplay');
+  const swToggle = document.getElementById('swToggleButton');
+  const swLap = document.getElementById('swLapButton');
+  const swReset = document.getElementById('swResetButton');
+  const lapList = document.getElementById('lapList');
 
-        lowFreqInput.addEventListener('input', setCustomPreset);
-        highFreqInput.addEventListener('input', setCustomPreset);
+  let swRunning = false, swStartAt = 0, swAccum = 0, swRaf = null, laps = [];
+  let allRecords = []; // Excel保存用（リセットしても消えない、このページを開いている間の記録）
 
+  function fmt(t) { // 秒 → mm:ss.cc
+    const m = Math.floor(t / 60), s = t % 60;
+    return `${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}`;
+  }
+  function speakSec(t) { // 秒 → 読み上げ用「5秒4」（秒の1の位＋小数1桁だけを読む。35.42秒→5秒4）
+    const t10 = Math.round(t * 10);
+    const ones = Math.floor(t10 / 10) % 10, tenth = t10 % 10;
+    return `${ones}秒${tenth}`;
+  }
+  function speak(text) {
+    if (!document.getElementById('voiceToggle').checked) return;
+    try {
+      // 途中で打ち切らず、順番にキューへ積む（ラップが速い場合は読み上げが遅れて流れる）
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP'; u.rate = 1.05;
+      speechSynthesis.speak(u);
+    } catch (e) { /* 未対応端末では無音 */ }
+  }
+  function swElapsed() { return swAccum + (swRunning ? (performance.now() - swStartAt) / 1000 : 0); }
+  function swRender() { swDisplay.textContent = fmt(swElapsed()); if (swRunning) { swRaf = requestAnimationFrame(swRender); } }
 
-        /**
-         * 時報の「ピッ」または「ポーン」の音を合成して再生する関数
-         */
-        function playSignal(frequency, duration, type) {
-            if (!audioContext || audioContext.state === 'suspended') {
-                 // AudioContextが停止中/未初期化の場合は音を鳴らさない
-                return;
-            }
+  function swToggleFn() {
+    if (!swRunning) {
+      swRunning = true; swStartAt = performance.now();
+      swToggle.textContent = 'ストップ'; swToggle.classList.replace('bg-blue-600', 'bg-red-600');
+      swLap.disabled = false; swLap.classList.remove('opacity-40');
+      swRender(); keepAwake(true);
+    } else {
+      swRunning = false; swAccum = swElapsed();
+      if (swRaf) cancelAnimationFrame(swRaf);
+      swDisplay.textContent = fmt(swAccum);
+      swToggle.textContent = 'スタート'; swToggle.classList.replace('bg-red-600', 'bg-blue-600');
+      swLap.disabled = true; swLap.classList.add('opacity-40');
+      speak(`ストップ。${speakSec(swAccum)}`);
+      keepAwake(false);
+    }
+  }
+  function swLapFn() {
+    if (!swRunning) return;
+    const total = swElapsed(); // 前の記録から計算せず、そのままの記録を使う
+    laps.push({ n: laps.length + 1, total });
+    const li = document.createElement('li');
+    li.className = 'py-2 flex justify-between text-base';
+    li.innerHTML = `<span class="font-semibold">LAP ${laps.length}</span><span class="font-bold">${fmt(total)}</span>`;
+    lapList.prepend(li);
+    allRecords.push({
+      datetime: new Date().toLocaleString('ja-JP'),
+      menu: menuLabel(),
+      no: laps.length,
+      timeText: fmt(total),
+      timeSec: Math.round(total * 100) / 100
+    });
+    updateExportButton();
+    speak(`${speakSec(total)}`);
+  }
+  function menuLabel() {
+    const d = document.getElementById('distInput').value;
+    const r = document.getElementById('repsInput').value;
+    const cm = document.getElementById('cycleMinInput').value;
+    const cs = document.getElementById('cycleSecInput').value;
+    return `${d}m×${r}本 ${cm}分${cs}秒サイクル`;
+  }
+  function swSyncStart() { // スタート音に連動：リセットして即スタート
+    swResetFn();
+    swToggleFn();
+  }
+  function swResetFn() {
+    swRunning = false; swAccum = 0; laps = [];
+    if (swRaf) cancelAnimationFrame(swRaf);
+    swDisplay.textContent = '00:00.00';
+    lapList.innerHTML = '';
+    swToggle.textContent = 'スタート'; swToggle.classList.replace('bg-red-600', 'bg-blue-600');
+    swLap.disabled = true; swLap.classList.add('opacity-40');
+    keepAwake(false);
+  }
+  swToggle.addEventListener('click', swToggleFn);
+  swLap.addEventListener('click', swLapFn);
+  swReset.addEventListener('click', swResetFn);
 
-            // オシレーター（音源）を作成
-            const oscillator = audioContext.createOscillator();
-            oscillator.type = 'sine'; // サイン波を使用
-            
-            // 周波数を設定
-            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+  // ================= 記録のExcel保存 =================
+  const exportButton = document.getElementById('exportButton');
+  function updateExportButton() {
+    exportButton.textContent = `📊 記録をExcelで保存（${allRecords.length}件）`;
+    if (allRecords.length > 0) { exportButton.disabled = false; exportButton.classList.remove('opacity-40'); }
+  }
+  exportButton.addEventListener('click', () => {
+    if (!allRecords.length) return;
+    const head = ['日時', 'メニュー', 'No.', '記録', '記録（秒）'];
+    const body = allRecords.map(r => [r.datetime, r.menu, r.no, r.timeText, r.timeSec]);
+    const stamp = new Date();
+    const fname = `練習記録_${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}`;
+    if (window.XLSX) {
+      const wsData = XLSX.utils.aoa_to_sheet([head, ...body]);
+      wsData['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 6 }, { wch: 12 }, { wch: 12 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsData, '記録');
+      XLSX.writeFile(wb, `${fname}.xlsx`);
+    } else {
+      // 通信が無くExcelライブラリが読めなかった場合はCSVで保存
+      const csv = '﻿' + [head, ...body].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = `${fname}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  });
 
-            // ゲイン（音量）ノードを作成
-            const gainNode = audioContext.createGain();
-            
-            // エンベロープ（音量変化）を設定
-            const now = audioContext.currentTime;
-            
-            // 音量を徐々に上げ（アタック）、保持し、徐々に下げる（リリース）
-            gainNode.gain.setValueAtTime(0, now); // 初期音量0
-            
-            // アタックタイム (0.01秒で最大音量へ)
-            gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01); 
-
-            // サスティン/ディケイ
-            if (type === 'long') {
-                // 「ポーン」（高音）の場合は長めに音を保持
-                gainNode.gain.setValueAtTime(0.5, now + duration - 0.1); 
-            }
-            
-            // リリースタイム (終了直前に音量を0へ)
-            gainNode.gain.linearRampToValueAtTime(0, now + duration); 
-
-            // 接続: オシレーター -> ゲイン -> 出力
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            // 再生開始と停止
-            oscillator.start();
-            oscillator.stop(now + duration);
-        }
-        
-        /**
-         * タイマーを停止し、表示をリセットする
-         */
-        function stopTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-            
-            startButton.textContent = '再生開始';
-            startButton.classList.replace('bg-red-600', 'bg-green-600');
-            messageDisplay.textContent = '停止しました。';
-            timerDisplay.classList.remove('text-red-600', 'text-yellow-500', 'text-orange-500', 'text-blue-600', 'text-gray-600');
-            timerDisplay.classList.add('text-gray-300');
-            // 表示を00.00にリセット
-            timerDisplay.textContent = '00.00';
-            
-            // AudioContextが存在し、実行中でなければサスペンド（一時停止）
-            if (audioContext && audioContext.state === 'running') {
-                audioContext.suspend();
-            }
-        }
-
-
-        /**
-         * 5秒周期で時報の音を鳴らすメインロジック
-         */
-        function checkAndPlaySignal(currentElapsed) {
-            // 現在設定されている周波数値を読み込む
-            const lowFreq = parseInt(lowFreqInput.value, 10) || 600;
-            const highFreq = parseInt(highFreqInput.value, 10) || 1800;
-
-            // 経過時間を小数点以下2桁で表示
-            const seconds = (currentElapsed % 60).toFixed(2);
-            timerDisplay.textContent = seconds;
-            
-            // 経過時間を5秒周期のどこにいるかで見る
-            const modTime = currentElapsed % cycleDuration; 
-            
-            // 音を鳴らす閾値 (±0.02秒の範囲)
-            const threshold = 0.02;
-
-            // --- 5秒サイクルのチェック ---
-
-            // 1. 予備信号 1 (T-2, 5秒周期の3秒目): 低音
-            if (modTime >= 3.0 - threshold && modTime < 3.0 + threshold) {
-                playSignal(lowFreq, 0.1, 'short'); // 低音
-                timerDisplay.classList.remove('text-red-600', 'text-orange-500', 'text-blue-600');
-                timerDisplay.classList.add('text-yellow-500');
-                messageDisplay.textContent = `ピッ（低音 ${lowFreq}Hz・予備信号）: ${currentElapsed.toFixed(1)}秒`;
-                return; 
-            }
-            
-            // 2. 予備信号 2 (T-1, 5秒周期の4秒目): 低音
-            if (modTime >= 4.0 - threshold && modTime < 4.0 + threshold) {
-                playSignal(lowFreq, 0.1, 'short'); // 低音
-                timerDisplay.classList.remove('text-red-600', 'text-yellow-500', 'text-blue-600');
-                timerDisplay.classList.add('text-orange-500');
-                messageDisplay.textContent = `ピッ（低音 ${lowFreq}Hz・予備信号）: ${currentElapsed.toFixed(1)}秒`;
-                return;
-            }
-
-            // 3. 時刻通知 (T, 5秒周期の0秒目): 高音
-            // ただし、0.0秒（開始時）は除く
-            if (currentElapsed > 0.1 && modTime >= 0.0 - threshold && modTime < 0.0 + threshold) {
-                playSignal(highFreq, 0.5, 'long'); // 高音
-                timerDisplay.classList.remove('text-yellow-500', 'text-orange-500', 'text-blue-600');
-                timerDisplay.classList.add('text-red-600');
-                messageDisplay.textContent = `ポーン！（高音 ${highFreq}Hz・時刻通知）: ${currentElapsed.toFixed(1)}秒`;
-                return;
-            }
-            
-            // --- 通常表示 ---
-            // 音が鳴っていないとき
-            if (timerInterval && !timerDisplay.classList.contains('text-blue-600')) {
-                // 音が鳴り終わったら、通常の青色に戻すためのクラスリセットチェック
-                const isSilentTime = modTime > 0.0 + threshold && modTime < 3.0 - threshold ||
-                                    modTime > 3.0 + threshold && modTime < 4.0 - threshold ||
-                                    modTime > 4.0 + threshold && modTime < 5.0 - threshold;
-
-                if (isSilentTime) {
-                     timerDisplay.classList.remove('text-red-600', 'text-yellow-500', 'text-orange-500', 'text-gray-300');
-                     timerDisplay.classList.add('text-blue-600');
-                     messageDisplay.textContent = '連続再生中... 5秒間隔で通知します。';
-                }
-            }
-        }
-
-        /**
-         * メインループを開始する関数
-         */
-        async function startTimer() {
-            // AudioContextがまだ存在しない、またはクローズされている場合のみ作成
-            if (!audioContext || audioContext.state === 'closed') {
-                try {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                } catch (e) {
-                    messageDisplay.textContent = 'エラー: Web Audio APIがサポートされていません。';
-                    return;
-                }
-            }
-            
-            // 重要な処理: ユーザー操作で確実に再開（モバイル規制対策）
-            if (audioContext.state === 'suspended') {
-                 // awaitを使って確実に再開を待つ
-                try {
-                    await audioContext.resume();
-                } catch (e) {
-                    messageDisplay.textContent = 'エラー: AudioContextの再開に失敗しました。ブラウザの音声自動再生制限をご確認ください。';
-                    return;
-                }
-            }
-            
-            // 処理が成功した後、UIを更新し、タイマーを開始する
-            startButton.textContent = '停止';
-            startButton.classList.replace('bg-green-600', 'bg-red-600');
-            timerDisplay.classList.remove('text-gray-300');
-            timerDisplay.classList.add('text-gray-600');
-            messageDisplay.textContent = '連続再生中...';
-
-            startTime = performance.now(); // タイマー開始時刻を記録
-
-            // 16ミリ秒（約60fps）ごとに更新
-            timerInterval = setInterval(() => {
-                const currentTime = performance.now();
-                const elapsedSeconds = (currentTime - startTime) / 1000;
-
-                // 経過時間に基づいて音を鳴らすかチェック
-                checkAndPlaySignal(elapsedSeconds);
-            }, 16); 
-        }
-
-        /**
-         * スタートボタンクリック時の処理
-         */
-        startButton.addEventListener('click', () => {
-            if (timerInterval) {
-                // 再生中なら停止
-                stopTimer();
-            } else {
-                // 停止中なら再生開始
-                startTimer();
-            }
-        });
-
-        // --- 初期化処理 ---
-        populatePresets();
-        messageDisplay.textContent = '周波数を設定、またはプリセットを選択し、「再生開始」を押してください。';
-        // 初回ロード時は停止状態に設定
-        stopTimer(); 
-        
-        // LINE共有リンクの設定
-        lineShareButton.href = `https://social-plugins.line.me/lineit/share?url=${LINE_SHARE_URL}&text=${LINE_SHARE_TEXT}`;
-
-    </script>
+  // キーボード：スペース＝スタート/ストップ、L・Enter＝ラップ
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.code === 'Space') { e.preventDefault(); swToggleFn(); }
+    else if (e.code === 'KeyL' || e.code === 'Enter') { e.preventDefault(); swLapFn(); }
+  });
+</script>
 </body>
 </html>
-
