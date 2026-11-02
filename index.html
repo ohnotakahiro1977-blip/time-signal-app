@@ -284,6 +284,18 @@
       swDisplay.textContent = fmt(swAccum);
       swToggle.textContent = 'スタート'; swToggle.classList.replace('bg-red-600', 'bg-blue-600');
       swLap.disabled = true; swLap.classList.add('opacity-40');
+      // ストップ時の最終タイムも記録に残す（ラップなしでもExcel保存できるように）
+      if (swAccum > 0) {
+        allRecords.push({
+          datetime: new Date().toLocaleString('ja-JP'),
+          menu: menuLabel(),
+          no: allRecords.length + 1,
+          timeText: fmt(swAccum),
+          timeSec: Math.round(swAccum * 100) / 100,
+          note: 'ストップ（最終）'
+        });
+        updateExportButton();
+      }
       speak(`ストップ。${speakSec(swAccum)}`);
       keepAwake(false);
     }
@@ -299,9 +311,10 @@
     allRecords.push({
       datetime: new Date().toLocaleString('ja-JP'),
       menu: menuLabel(),
-      no: laps.length,
+      no: allRecords.length + 1,
       timeText: fmt(total),
-      timeSec: Math.round(total * 100) / 100
+      timeSec: Math.round(total * 100) / 100,
+      note: ''
     });
     updateExportButton();
     speak(`${speakSec(total)}`);
@@ -333,30 +346,42 @@
   // ================= 記録のExcel保存 =================
   const exportButton = document.getElementById('exportButton');
   function updateExportButton() {
-    exportButton.textContent = `📊 記録をExcelで保存（${allRecords.length}件）`;
+    exportButton.textContent = allRecords.length > 0
+      ? `📊 記録をExcelで保存（${allRecords.length}件）`
+      : '📊 記録をExcelで保存（ラップかストップで記録が入ると押せます）';
     if (allRecords.length > 0) { exportButton.disabled = false; exportButton.classList.remove('opacity-40'); }
   }
   exportButton.addEventListener('click', () => {
     if (!allRecords.length) return;
-    const head = ['日時', 'メニュー', 'No.', '記録', '記録（秒）'];
-    const body = allRecords.map(r => [r.datetime, r.menu, r.no, r.timeText, r.timeSec]);
+    const head = ['日時', 'メニュー', 'No.', '記録', '記録（秒）', '備考'];
+    const body = allRecords.map(r => [r.datetime, r.menu, r.no, r.timeText, r.timeSec, r.note || '']);
     const stamp = new Date();
     const fname = `練習記録_${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}`;
-    if (window.XLSX) {
+    let savedAs = '';
+    try {
+      if (!window.XLSX) throw new Error('xlsx未読込');
       const wsData = XLSX.utils.aoa_to_sheet([head, ...body]);
-      wsData['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 6 }, { wch: 12 }, { wch: 12 }];
+      wsData['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, wsData, '記録');
-      XLSX.writeFile(wb, `${fname}.xlsx`);
-    } else {
-      // 通信が無くExcelライブラリが読めなかった場合はCSVで保存
-      const csv = '﻿' + [head, ...body].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      a.download = `${fname}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      a.href = url; a.download = `${fname}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      savedAs = 'Excel';
+    } catch (e) {
+      // Excelが作れなかった場合はCSVで保存
+      const csv = '﻿' + [head, ...body].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `${fname}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      savedAs = 'CSV';
     }
+    alert(`${allRecords.length}件の記録を${savedAs}ファイルで保存しました。ダウンロード／ファイルアプリを確認してください。`);
   });
 
   // キーボード：スペース＝スタート/ストップ、L・Enter＝ラップ
